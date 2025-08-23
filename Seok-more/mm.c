@@ -42,12 +42,53 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+/////////////////////////////////
+static char* heap_listp = NULL;
+static void* extend_heap(size_t words);
+static void* coalesce(void* bp);
+static void* find_fit(size_t asize);
+static void place(void* bp, size_t asize);
+/////////////////////////////////
+
 /*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
+   
+    if ((heap_listp = mem_sbrk(4 * WSIZE)) == (void*)-1)  return -1;
+
+    PUT(heap_listp, 0);                            // 정렬 패딩
+    PUT(heap_listp + (1 * WSIZE), PACK(DSIZE, 1)); // 프롤로그 헤더
+    PUT(heap_listp + (2 * WSIZE), PACK(DSIZE, 1)); // 프롤로그 푸터
+    PUT(heap_listp + (3 * WSIZE), PACK(0, 1));     // 에필로그 헤더
+
+    heap_listp += (2 * WSIZE); // heap_listp를 첫 가용 블록의 payload 주소로 이동
+
+    if (extend_heap(CHUNKSIZE / WSIZE) == NULL) return -1;
+
     return 0;
+}
+
+/*
+ * extend_heap - 힙을 words만큼 확장, 새로운 가용 블록을 리턴함
+ */
+static void* extend_heap(size_t words)
+{
+    char* bp;
+    size_t size;
+
+    // 항상 8바이트 단위로 정렬, 짝수 워드 할당
+    size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+    if ((long)(bp = mem_sbrk(size)) == -1) return NULL;
+
+    // 새 가용 블록의 헤더/푸터, 새로운 에필로그 헤더 초기화
+    PUT(HDRP(bp), PACK(size, 0));         
+    PUT(FTRP(bp), PACK(size, 0));         
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); 
+
+    return bp
+    // return coalesce(bp);
 }
 
 /*
