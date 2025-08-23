@@ -17,6 +17,7 @@
 
 #include "mm.h"
 #include "memlib.h"
+#include "mmdefs.h"
 
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
@@ -42,11 +43,51 @@ team_t team = {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
+static char* heap_listp;
+
+static void* extend_heap(size_t words)
+{
+    char *bp; // 블록 포인터
+    size_t size;
+
+    /* 항상 더블 워드(8바이트) 정렬로 맞추기 위해 사이즈를 설정하고 힙을 확장 */
+    size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+    bp = mem_sbrk(size);
+    if((long)bp == -1)
+    {
+        return NULL;
+    }
+
+    /* 블록 헤더/푸터를 메모리 할당 해제(free)하고 에필로그 헤더를 다시 설정 */
+    PUT(HDRP(bp), PACK(size, 0));
+    PUT(FTRP(bp), PACK(size, 0));
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1));
+
+    return bp;
+}
+
 /*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
+    heap_listp = mem_sbrk((4 * WSIZE));
+    if (heap_listp == (void *) - 1)
+    {
+        return -1;
+    }
+
+    PUT(heap_listp, 0); // 정렬 패딩
+    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); // 프롤로그 헤더
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); // 프롤로그 푸터
+    PUT(heap_listp + (3*WSIZE), PACK(0, 1)); // 에필로그 헤더
+    heap_listp += (2*WSIZE);
+
+    if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
+    {
+        return -1;
+    }
+
     return 0;
 }
 
