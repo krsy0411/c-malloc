@@ -25,6 +25,9 @@ int mm_init(void);
 void* mm_malloc(size_t size);
 void mm_free(void *ptr);
 void* mm_realloc(void *ptr, size_t size);
+static void* find_fit_first(size_t request_size);
+static void* find_fit_next(size_t request_size);
+static void* find_fit_best(size_t request_size);
 
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
@@ -137,7 +140,7 @@ int mm_init(void)
 /* 
     fit한 공간(가용 블록) 찾아내기
 */
-static void* find_fit_first(size_t size)
+static void* find_fit_first(size_t request_size)
 {
     // first fit
     void *bp;
@@ -145,8 +148,8 @@ static void* find_fit_first(size_t size)
     for(bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
     {
         // 1) 현재 블록의 헤더를 통해 가용 블록인지 확인
-        // 2) 현재 블록의 크기가 요청한 크기(size)보다 크거나 같은지 확인
-        if(!GET_ALLOC(HDRP(bp)) && (size <= GET_SIZE(HDRP(bp))))
+        // 2) 현재 블록의 크기가 요청한 크기(request_size)보다 크거나 같은지 확인
+        if(!GET_ALLOC(HDRP(bp)) && (request_size <= GET_SIZE(HDRP(bp))))
         {
             return bp;
         }
@@ -154,6 +157,25 @@ static void* find_fit_first(size_t size)
 
     // fit한 블록이 없는 경우
     return NULL;
+}
+
+static void* find_fit_best(size_t request_size)
+{
+    void* bp;
+    void* best_bp = NULL;
+
+    for(bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+    {
+        if(!GET_ALLOC(HDRP(bp)) && (request_size <= GET_SIZE(HDRP(bp))))
+        {
+            if(!best_bp || GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(best_bp)))
+            {
+                best_bp = bp;
+            }
+        }
+    }
+
+    return best_bp;
 }
 
 /* 
@@ -215,7 +237,9 @@ void* mm_malloc(size_t size)
     }
 
     // 가용 리스트 찾기
-    if((bp = find_fit_first(adjusted_size)) != NULL)
+    // bp = find_fit_first(adjusted_size);
+    bp = find_fit_best(adjusted_size);
+    if(bp != NULL)
     {
         place(bp, adjusted_size);
         return bp;
