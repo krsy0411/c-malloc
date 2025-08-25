@@ -99,8 +99,43 @@ void *mm_malloc(size_t size)
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *ptr)
-{
+void mm_free(void *bp){
+    size_t size = GET_SIZE(HDRP(bp));       //bp헤더 사이즈 받아서
+
+    PUT(HDRP(bp), PACK(size, 0));       //헤더 가용
+    PUT(FTRP(bp), PACK(size, 0));       //푸터 가용
+    coalesce(bp);       //블록 병합
+}
+
+static void *coalesce(void *bp){
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));     //이전 블럭의 푸터 할당
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));     //다음 블럭의 헤더 할당
+    size_t size = GET_SIZE(HDRP(bp));       //bp 실제 크기
+
+    if (prev_alloc && next_alloc){      //이전 블럭과 다음 블럭이 할당 돼있으면 합칠블록 없으니까
+        return bp;      //현재 bp반환
+    }
+
+    else if (prev_alloc && !next_alloc){        //이전 블럭 = 할당, 다음블록 = 가용
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));      //다음 블록 크기를 사이즈에 더해줌
+        PUT(HDRP(bp), PACK(size, 0));       //현재 블록 헤더를 업뎃
+        PUT(FTRP(bp), PACK(size, 0));       //현재 블록 푸터를 업뎃
+    }
+
+    else if (!prev_alloc && next_alloc){        //이전 블록 = 가용, 다음블럭 = 할당 
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));      //이전블럭의 헤더 사이즈만큼 더해줌
+        PUT(FTRP(bp), PACK(size, 0));       //현재블럭 푸터 업뎃
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));        //이전 블럭의 헤더 업뎃
+        bp = PREV_BLKP(bp);     //이전 블럭으로 점프, 시작점 = 이전 블록
+    }
+
+    else {      //다음,이전블럭 다 없으면
+        size += GET_SIZE(HDRP(PREV_BLKP(bp))) + GET_SIZE(FTRP(NEXT_BLKP(bp)));      //이전 다음 블럭 사이즈 더해주고
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));        //이전 블럭의 헤더 업뎃
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));       //다음 블록의 푸터(끝점+4) 업뎃
+        bp = PREV_BLKP(bp);     //이전 블록으로 점프, 시작점 = 이전블록
+    }
+    return bp;      //병합 완료된 bp 시작점 반환
 }
 
 /*
