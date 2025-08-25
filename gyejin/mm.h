@@ -11,7 +11,7 @@
 #define GET(p)          (*(unsigned int *)(p))
 #define PUT(p, val)     (*(unsigned int *)(p) = (val))
 
-#define GET_SIZE(p)     (GET(p) & -0x7)     //[?] 00...000111 ~로 다 뒤집어(마스크), AND연산하면 강제로 000이 되고 실제 크기정보만 남게됨, 하위3비트 0으로 초기화 해주는 작업
+#define GET_SIZE(p)     (GET(p) & ~0x7)     //[?] 00...000111 ~로 다 뒤집어(마스크), AND연산하면 강제로 000이 되고 실제 크기정보만 남게됨, 하위3비트 0으로 초기화 해주는 작업
 #define GET_ALLOC(p)    (GET(p) & 0x1)      //할당 받으면 하위 1비트 1로 변경
 
 #define HDRP(bp)        ((char *)(bp) - WSIZE)      //헤더 주소 계산 : 페이로드 시작주소 - 블록의 전체 크기
