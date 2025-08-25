@@ -58,23 +58,16 @@ static void place(void *bp, size_t asize);
  */
 int mm_init(void)
 {
-    // 1. 초기 빈 힙 생성 (4워드 메모리 할당)
+    
     if ((heap_listp = mem_sbrk(4*WSIZE)) == (void*)-1)  return -1;
 
-    // 2. 빈 힙에 프롤로그 블록과 에필로그 헤더를 추가 -> 프롤로그 불록은 힙의 맨 앞부분에 존재하는 allocated된 더미 블록
-    // 초기 힙 구조 : [정렬 패딩][프롤로그 헤더][프롤로그 푸터][첫 가용 블록 ...][에필로그 헤더]
-    //              ↑         ↑            ↑            ↑               ↑
-    //        heap_listp heap_listp+WSIZE heap_listp+2*WSIZE heap_listp+3*WSIZE ...   
-    
     PUT(heap_listp, 0);                          // 정렬 패딩
     PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); // 프롤로그 헤더
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); // 프롤로그 푸터
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));     // 에필로그 헤더
 
-    // heap_listp += (WSIZE); -> 이건 프롤로그푸터를 가리켜서 그 다음 주소가 첫 가용 블록의 헤더임
-    heap_listp += (2*WSIZE); // heap_listp를 첫 가용 블록의 payload 주소로 이동(보통 payload 기준으로 블록포인터 잡음)
+    heap_listp += (2*WSIZE); /
 
-    // 3. 빈 힙을 CHUNKSIZE 크기의 가용 블록으로 확장 
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) return -1;
 
     return 0;
@@ -92,12 +85,11 @@ static void *extend_heap(size_t words)
     size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
     if ((long)(bp = mem_sbrk(size)) == -1) return NULL;
     
-    // 새 가용 블록의 헤더/푸터, 새로운 에필로그 헤더 초기화
-    PUT(HDRP(bp), PACK(size, 0));         // 헤더: 크기, free
-    PUT(FTRP(bp), PACK(size, 0));         // 푸터: 크기, free
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // 에필로그 헤더: 크기 0, 할당1
+ 
+    PUT(HDRP(bp), PACK(size, 0));         
+    PUT(FTRP(bp), PACK(size, 0));         
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /
 
-    // 이전 블록이 free라면 합침 (coalesce)
     return coalesce(bp);
 }
 
@@ -108,8 +100,8 @@ static void *extend_heap(size_t words)
  */
 void *mm_malloc(size_t size)
 {
-    size_t asize;         // 실제 할당 블록 크기 (헤더/푸터 포함, 정렬)
-    size_t extendsize;    // fit이 없을 때 힙 확장 크기
+    size_t asize;         
+    size_t extendsize;    
     char *bp;
 
     if (size == 0) return NULL;
@@ -117,20 +109,19 @@ void *mm_malloc(size_t size)
     // 1. 최소 블록 크기(헤더+payload+푸터) 맞추고 8바이트 단위로 정렬
     if (size <= DSIZE)
     {
-        // 블록의 payload alignment를 8바이트로 징렬하라고 CSAPP문서에 존재함
         asize = 2 * DSIZE; // 최소 16바이트
     }
     else
     {
         // asize = ALIGN(size + DSIZE); 
-        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE); // 헤더 + payload + 푸터
+        asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE); 
     }
 
     // 2. 가용 리스트에서 asize만큼 맞는 블록 탐색
     if ((bp = find_fit(asize)) != NULL)
     {
-        place(bp, asize);    // 찾으면 그 블록에 asize만큼 할당
-        return bp;           // payload 주소 리턴
+        place(bp, asize);    
+        return bp;           
     }
 
     // 3. 못 찾으면 힙 확장 후 새 블록 할당
@@ -148,7 +139,7 @@ static void *find_fit(size_t asize)
 {
     // 전체 순회 
     char *bp = heap_listp;
-    while (GET_SIZE(HDRP(bp)) > 0) // 에필로그 블록이 크기가 0이니까
+    while (GET_SIZE(HDRP(bp)) > 0) 
     {
         if (!GET_ALLOC(HDRP(bp)) && (GET_SIZE(HDRP(bp)) >= asize))
         {
@@ -164,7 +155,7 @@ static void *find_fit(size_t asize)
  */
 static void place(void *bp, size_t asize)
 {
-    size_t totalsize = GET_SIZE(HDRP(bp)); // 현재 가용 블록의 전체 크기
+    size_t totalsize = GET_SIZE(HDRP(bp)); 
 
     // 남은 크기가 최소 블록 크기(헤더+payload+푸터 = 16바이트) 이상이면 분할
     if ((totalsize - asize) >= (2 * DSIZE))
@@ -173,13 +164,13 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
 
-        char *next_bp = NEXT_BLKP(bp); // 남은 영역의 다음 블록 payload 주소
-        PUT(HDRP(next_bp), PACK(totalsize - asize, 0)); // 남은 영역 헤더: 남은 크기, free해버림
-        PUT(FTRP(next_bp), PACK(totalsize - asize, 0)); // 남은 영역 푸터: 남은 크기, free해버림
+        char *next_bp = NEXT_BLKP(bp); 
+        PUT(HDRP(next_bp), PACK(totalsize - asize, 0)); 
+        PUT(FTRP(next_bp), PACK(totalsize - asize, 0)); 
     }
     else
     {
-        // 그냥 전부 할당
+
         PUT(HDRP(bp), PACK(totalsize, 1));
         PUT(FTRP(bp), PACK(totalsize, 1));
     }
@@ -191,9 +182,9 @@ static void place(void *bp, size_t asize)
  */
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); // 이전 블록 할당 여부
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); // 다음 블록 할당 여부
-    size_t size = GET_SIZE(HDRP(bp));                   // 현재 블록 크기
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); 
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); 
+    size_t size = GET_SIZE(HDRP(bp));                   
 
     // Case 1: 이전/다음 모두 할당됨
     if (prev_alloc && next_alloc)
@@ -246,7 +237,7 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    if (ptr == NULL) return mm_malloc(size); // 포인터가 NULL이면 새 블록 할당해야 하는구나
+    if (ptr == NULL) return mm_malloc(size); // ! 포인터가 NULL이면 새 블록 할당해야함
     if (size == 0)
     {
         mm_free(ptr);
