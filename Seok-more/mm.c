@@ -88,7 +88,7 @@ static void *extend_heap(size_t words)
  
     PUT(HDRP(bp), PACK(size, 0));         
     PUT(FTRP(bp), PACK(size, 0));         
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); 
 
     return coalesce(bp);
 }
