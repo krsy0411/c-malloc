@@ -85,15 +85,38 @@ static void *extend_heap(size_t words){
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1)
+    size_t asize;       //블록사이즈
+    size_t extendsize;  //확장 힙 사이즈
+    char *bp;
+
+    //사이즈가 0이면 그냥 NULL반환
+    if (size==0){
         return NULL;
-    else
-    {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
     }
+
+    //요청 사이즈가 8바이트보다 작으면
+    if (size <= DSIZE){     
+        asize = 2*DSIZE;    //[?] 최소 블럭 크기인 16바이트로 세팅 (헤더 4 + 페이로드 8 + 푸터 4)
+    }
+    //8바이트보다 크면
+    else{
+        asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);   //[?](사이즈 + 8바이트 + 7바이트) / 8바이트 한거를 8바이트에 곱하기 => 8의 배수로 올림 처리?
+    }
+
+    bp = find_first_fit(asize);
+    if (bp != NULL){      //배치 정렬 first-fit으로 호출
+        place(bp, asize);       //찾은 공간에 블록 할당 및 분할
+        return bp;
+    }
+
+    //적절한 가용 블럭이 없는 경우
+    extendsize = MAX(asize, CHUNKSIZE);     //extend는 청크 사이즈와 asize중에서 큰거
+    if ((bp = extend_heap(extendsize/WSIZE)) == NULL){      //extend를 4바이트로 나눈만큼 힙을 늘림 왜? 
+        return NULL;
+    }
+
+    place(bp, asize);       //확장된 힙 공간에 할당
+    return bp;
 }
 
 /*
@@ -136,6 +159,39 @@ static void *coalesce(void *bp){
         bp = PREV_BLKP(bp);     //이전 블록으로 점프, 시작점 = 이전블록
     }
     return bp;      //병합 완료된 bp 시작점 반환
+}
+
+//first-fit 탐색 함수 (배치 정렬 함수)
+static void *find_first_fit(size_t asize){
+    void *bp;
+
+    //bp 힙 처음부터 시작, 다음블록으로 하나씩 이동하면서 헤더가 0보다 커지면(=에필로그 블럭을 만나면) 끝
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)){      
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))){     //헤더가 가용이고 요청한 asize를 담기에 충분하다면
+            return bp;      //블록 포인터 반환
+        }
+    }
+    return NULL;        //적절한거 찾지 못하면 NULL
+}
+
+static void place(void *bp, size_t asize){
+    size_t free_size = GET_SIZE(HDRP(bp));      //헤더 사이즈를 받아 free_size에 저장
+
+    //현재 가용블럭 크기가 요청된 크기를 할당하고도 (헤더 크기 - 요청받은 할당 크기) 16바이트보다 크면, 최소블록크기인 16바이트 이상 남으면 블록 분할
+    if ((free_size - asize) >= (2*DSIZE)) {   
+        //앞부분 블록 : 요청한 크기만큼 할당  
+        PUT(HDRP(bp), PACK(asize, 1));      //헤더 -> 할당
+        PUT(FTRP(bp), PACK(asize, 1));      //푸터 -> 할당
+        //다음 블록에 남은 공간을 가용으로 만듦
+        bp = NEXT_BLKP(bp);     //분할된 뒷부분 블럭으로 이동
+        PUT(HDRP(bp), PACK(free_size-asize, 0));    //요청 크기만큼 뺀 크기를 헤더 -> 가용 
+        PUT(FTRP(bp), PACK(free_size-asize, 0));    // ""                  푸터 -> 가용
+    }
+    //(헤더 크기 - 요청받은 할당 크기) 가 16바이트보다 작으면 == 남은 공간이 16보다 작아서 분할 못하는 경우
+    else{
+        PUT(HDRP(bp), PACK(free_size, 1));      //헤더사이즈만큼만 헤더에 할당
+        PUT(FTRP(bp), PACK(free_size, 1));      //헤더사이즈만큼만 푸터에 할당
+    }
 }
 
 /*
