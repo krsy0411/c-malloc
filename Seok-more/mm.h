@@ -21,8 +21,19 @@
 #define NEXT_BLKP(bp)   ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) // bp 기준 다음 블록 포인터 계산
 #define PREV_BLKP(bp)   ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) // bp 기준 이전 블록 포인터 계산
 
+//[헤더][pred][succ][payload][푸터]
+//     ↑     ↑
+//     bp   bp+WSIZE
+#define PRED(bp) (*(void **)(bp))
+#define SUCC(bp) (*(void **)((char *)(bp) + WSIZE))
 
-// -------------------------------------------------------------
+// -------- Unreal 스타일 전용 매크로 --------
+#define BIN_COUNT      32                  // bin 개수
+#define BIN_MIN_SIZE   16                  // 최소 bin size
+#define BIN_MAX_SIZE   512                 // 최대 bin size (마지막 bin 크기, 실제 bin_sizes 배열에서 확인)
+#define MIN_BLOCK_SIZE (WSIZE + WSIZE + WSIZE + WSIZE) // 헤더 + pred + succ + 푸터 = 4*WSIZE
+
+// -----------------------------------------
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
