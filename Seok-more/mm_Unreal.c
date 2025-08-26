@@ -1,33 +1,4 @@
 /*
- *  언리얼 스타일
- * ┌─────────────────────────────┬─────────────────────────────────────────────┬────────────────────────────────────────────────────────────────────────────┐
- * │        [구분]                │                  [방식]                     │                            [특징]                                           │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 메모리 관리 구조              │ Segregated Free List                        │ 요청 크기에 따라 32개 bin(`bins[]`)의 분리형 free list 사용.                    │
- * │                             │                                             │ 각 bin은 특정 크기 범위의 free 블록만 관리.                                     │
- * │                             │                                             │ BIN_MAX_SIZE(=512) 초과 블록은 별도 `large_listp`에서 관리.                    │
- * │                             │                                             │ 크기별 분리 관리로 탐색 효율 향상, 단편화 감소.                                  │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ Free List 연결               │ Explicit Doubly Linked List                 │ 모든 free 블록은 pred/succ 포인터 포함 이중 연결 리스트로 연결.                  │
- * │                             │                                             │ large_listp는 주소 오름차순 유지(coalesce 효율↑).                             │
- * │                             │                                             │ small bin은 LIFO(맨 앞에 삽입, first-fit 최적화).                             │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 탐색 정책(find_fit)          │ First-Fit(bin) / Best-Fit(large)            │ small bin은 first-fit(LIFO), large_list는 best-fit 탐색.                     │
- * │                             │                                             │ 요청 크기 이상인 첫 블록을 즉시 할당(Unreal 엔진 실제 방식과 유사).                │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 삽입 정책                    │ 주소 오름차순(large) / LIFO(small)            │ large_listp는 주소순, small bin은 맨 앞(LIFO) 삽입 → 탐색/병합 효율↑.           │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 할당 정책(place)             │ 분할 시 최소 블록 크기 보장                     │ 남는 블록이 MIN_BLOCK_SIZE 이상일 때만 분할.                                   │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 병합 정책(coalesce)          │ 즉시 병합                                     │ 인접 free 블록과 즉시 병합 후 bin/large list에 재삽입.                         │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 힙 확장                      │ mem_sbrk()                                  │ fit 실패 시 CHUNKSIZE 또는 요청 크기만큼 확장.                                 │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 블록 구조                    │ Header + Footer + Payload (+ pred/succ)     │ free 블록은 pred/succ 포인터 포함, 모든 블록 8바이트 정렬.                       │
- * ├─────────────────────────────┼─────────────────────────────────────────────┼────────────────────────────────────────────────────────────────────────────┤
- * │ 정렬 단위                    │ 8바이트 (ALIGNMENT = 8)                      │ 모든 블록 크기를 8바이트 단위로 정렬.                                           │
- * └─────────────────────────────┴─────────────────────────────────────────────┴────────────────────────────────────────────────────────────────────────────┘
- *
  * - Segregated Free List 구조: 크기별로 분리된 여러 bin을 사용해 탐색 속도와 단편화 최소화.
  * - small bin은 LIFO(빠른 할당), large_list는 주소순(best-fit)으로 관리.
  * - first-fit(빠른 탐색, 실 Unreal 스타일)과 best-fit(대형 블록 효율) 동시 적용.
@@ -373,27 +344,25 @@ static void *find_fit(size_t asize)
 
 static void place(void *bp, size_t asize)
 {
-    size_t totalsize = GET_SIZE(HDRP(bp)); // 현재 가용 블록의 전체 크기
+    size_t totalsize = GET_SIZE(HDRP(bp));
 
-    delete_free_block(bp); // 현재 속한 리스트(bin 또는 large)에서 제거
+    delete_free_block(bp); 
 
     // 분할 정책: 남은 크기가 MIN_BLOCK_SIZE 이상이어야 분할
     if ((totalsize - asize) >= MIN_BLOCK_SIZE)
     {
-        // 블록 분할
         PUT(HDRP(bp), PACK(asize, 1));
         PUT(FTRP(bp), PACK(asize, 1));
 
-        char *next_bp = NEXT_BLKP(bp); // 남은 영역의 다음 블록 payload 주소
-        PUT(HDRP(next_bp), PACK(totalsize - asize, 0)); // 남은 영역 헤더: 남은 크기, free
-        PUT(FTRP(next_bp), PACK(totalsize - asize, 0)); // 남은 영역 푸터: 남은 크기, free
+        char *next_bp = NEXT_BLKP(bp); 
+        PUT(HDRP(next_bp), PACK(totalsize - asize, 0)); 
+        PUT(FTRP(next_bp), PACK(totalsize - asize, 0)); /
 
-        insert_free_block(next_bp); // 크기에 맞는 bin 또는 large list에 삽입
+        insert_free_block(next_bp); 
 
     }
     else
     {
-        // 그냥 전부 할당
         PUT(HDRP(bp), PACK(totalsize, 1));
         PUT(FTRP(bp), PACK(totalsize, 1));
     }
@@ -405,9 +374,9 @@ static void place(void *bp, size_t asize)
  */
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); // 이전 블록 할당 여부
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); // 다음 블록 할당 여부
-    size_t size = GET_SIZE(HDRP(bp));                   // 현재 블록 크기
+    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp))); 
+    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp))); 
+    size_t size = GET_SIZE(HDRP(bp));                   
 
     if (prev_alloc && next_alloc)
     {
@@ -586,3 +555,4 @@ void *mm_realloc(void *ptr, size_t size)
 
     return newptr;
 }
+
