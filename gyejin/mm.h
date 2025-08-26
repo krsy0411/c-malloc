@@ -3,9 +3,9 @@
 #define DSIZE   8       //더블 워드 사이즈
 #define CHUNKSIZE   (1<<12)     //힙 - 초기 가용 블럭 생성
 
-#define MAX     (x, y) ((x) > (y) ? (x) : (y))  //매크로 함수 : 괄호 필수, 일반 함수보다 단순 함수 구현에선 빠름
+#define MAX(x, y)   ((x) > (y) ? (x) : (y))  //매크로 함수 : 괄호 필수, 일반 함수보다 단순 함수 구현에선 빠름
 
-#define PACK(size, alloc)   ((size) || (alloc)) //하위 3비트로 할당/가용 상태인지 체크, or연산이니까 1이면 무조건 1, 0이면 무조건 0들어감
+#define PACK(size, alloc)   ((size) | (alloc)) //하위 3비트로 할당/가용 상태인지 체크, or연산이니까 1이면 무조건 1, 0이면 무조건 0들어감
 
 //주소값 읽고 쓰기
 #define GET(p)          (*(unsigned int *)(p))
