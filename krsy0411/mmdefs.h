@@ -14,11 +14,11 @@
 #define PUT(p, val) (*(unsigned int *)(p) = (val))
 
 /* 블록 정보 추출 매크로 */
-#define GET_SIZE(p) (GET(p) & -0x7)
+#define GET_SIZE(p) (GET(p) & ~0x7)
 #define GET_ALLOC(p) (GET(p) & 0x1)
 
 /* 블록 포인터 연산 매크로 */
-#define HDRP(bp) ((char *)(bp - WSIZE))
+#define HDRP(bp) ((char *)(bp) - WSIZE)
 #define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
 /* 인접 블록 포인터 연산 매크로 */
