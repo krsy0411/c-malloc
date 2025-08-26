@@ -103,7 +103,8 @@ void *mm_malloc(size_t size)
         asize = DSIZE * ((size + (DSIZE) + (DSIZE - 1)) / DSIZE);   //[?](사이즈 + 8바이트 + 7바이트) / 8바이트 한거를 8바이트에 곱하기 => 8의 배수로 올림 처리?
     }
 
-    if ((bp = find_first_fit(asize)) != NULL){      //배치 정렬 first-fit으로 호출
+    bp = find_first_fit(asize);
+    if (bp != NULL){      //배치 정렬 first-fit으로 호출
         place(bp, asize);       //찾은 공간에 블록 할당 및 분할
         return bp;
     }
@@ -174,22 +175,22 @@ static void *find_first_fit(size_t asize){
 }
 
 static void place(void *bp, size_t asize){
-    size_t csize = GET_SIZE(HDRP(bp));      //헤더 사이즈를 받아 csize에 저장
+    size_t free_size = GET_SIZE(HDRP(bp));      //헤더 사이즈를 받아 free_size에 저장
 
     //현재 가용블럭 크기가 요청된 크기를 할당하고도 (헤더 크기 - 요청받은 할당 크기) 16바이트보다 크면, 최소블록크기인 16바이트 이상 남으면 블록 분할
-    if ((csize - asize) >= (2*DSIZE)) {   
+    if ((free_size - asize) >= (2*DSIZE)) {   
         //앞부분 블록 : 요청한 크기만큼 할당  
         PUT(HDRP(bp), PACK(asize, 1));      //헤더 -> 할당
         PUT(FTRP(bp), PACK(asize, 1));      //푸터 -> 할당
         //다음 블록에 남은 공간을 가용으로 만듦
         bp = NEXT_BLKP(bp);     //분할된 뒷부분 블럭으로 이동
-        PUT(HDRP(bp), PACK(csize-asize, 0));    //요청 크기만큼 뺀 크기를 헤더 -> 가용 
-        PUT(FTRP(bp), PACK(csize-asize, 0));    // ""                  푸터 -> 가용
+        PUT(HDRP(bp), PACK(free_size-asize, 0));    //요청 크기만큼 뺀 크기를 헤더 -> 가용 
+        PUT(FTRP(bp), PACK(free_size-asize, 0));    // ""                  푸터 -> 가용
     }
     //(헤더 크기 - 요청받은 할당 크기) 가 16바이트보다 작으면 == 남은 공간이 16보다 작아서 분할 못하는 경우
     else{
-        PUT(HDRP(bp), PACK(csize, 1));      //헤더사이즈만큼만 헤더에 할당
-        PUT(FTRP(bp), PACK(csize, 1));      //헤더사이즈만큼만 푸터에 할당
+        PUT(HDRP(bp), PACK(free_size, 1));      //헤더사이즈만큼만 헤더에 할당
+        PUT(FTRP(bp), PACK(free_size, 1));      //헤더사이즈만큼만 푸터에 할당
     }
 }
 
