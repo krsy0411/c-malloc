@@ -20,6 +20,13 @@
 #define NEXT_BLKP(bp)   ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))       //다음 블럭으로 점프
 #define PREV_BLKP(bp)   ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))       //이전 블럭으로 점프
 
+//가용 리스트의 이전/다음 포인터 값을 읽어옴
+#define GET_PREV(bp)    (*(char**)(bp))       //페이로드 시작점에 PREV 포인터
+#define GET_SUCC(bp)    (*(char**)(bp + DSIZE))         //페이로드 시작점 + 8바이트 뒤에 SUCC 포인터
+//가용 리스트의 이전/다음 포인터 값을 씀
+#define PUT_PREV(bp, val)   (*(char**)(bp) = (val))
+#define PUT_SUCC(bp, val)  (*(char**)(bp + DSIZE) = (val))  
+
 extern int mm_init (void);
 extern void *mm_malloc (size_t size);
 extern void mm_free (void *ptr);
