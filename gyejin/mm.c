@@ -104,7 +104,7 @@ void *mm_malloc(size_t size)
 
     //[ex+] 요청 사이즈가 8바이트보다 작으면
     if (size <= 2*DSIZE){     
-        asize = 3*DSIZE;    //[ex+] 최소 블럭 크기인 24바이트로 세팅 (헤더 4 + 페이로드 16 + 푸터 4) =>  => explicit에서는 최소블럭크기 24바이트 (페이로드에 PREV, SUCC 두개의 포인터)
+        asize = 3*DSIZE;    //[ex+] 최소 블럭 크기인 24바이트로 세팅 (헤더 4 + 페이로드 16 + 푸터 4)=> explicit에서는 최소블럭크기 24바이트 (페이로드에 PREV, SUCC 두개의 포인터)
     }
     //8바이트보다 크면
     else{
@@ -237,7 +237,7 @@ static void place(void *bp, size_t asize){
 
     mm_remove_block(bp);        //[ex+] 할당할거니까 가용리스트에서 제거
 
-    //현재 가용블럭 크기가 요청된 크기를 할당하고도 (헤더 크기 - 요청받은 할당 크기) 16바이트보다 크면, 최소블록크기인 16바이트 이상 남으면 블록 분할
+    //[ex+] 현재 가용블럭 크기가 요청된 크기를 할당하고도 (헤더 크기 - 요청받은 할당 크기) 24바이트보다 크면, 최소블록크기인 24바이트 이상 남으면 블록 분할
     if ((free_size - asize) >= (3*DSIZE)) {   
         //앞부분 블록 : 요청한 크기만큼 할당  
         PUT(HDRP(bp), PACK(asize, 1));      //헤더 -> 할당
@@ -248,7 +248,7 @@ static void place(void *bp, size_t asize){
         PUT(FTRP(bp), PACK(free_size-asize, 0));    // ""                  푸터 -> 가용
         mm_insert_block(bp);        //[ex+] 새로운 가용 블록 리스트에 추가
     }
-    //(헤더 크기 - 요청받은 할당 크기) 가 16바이트보다 작으면 == 남은 공간이 16보다 작아서 분할 못하는 경우
+    //(헤더 크기 - 요청받은 할당 크기) 가 24바이트보다 작으면 == 남은 공간이 24보다 작아서 분할 못하는 경우
     else{
         PUT(HDRP(bp), PACK(free_size, 1));      //헤더사이즈만큼만 헤더에 할당
         PUT(FTRP(bp), PACK(free_size, 1));      //헤더사이즈만큼만 푸터에 할당
